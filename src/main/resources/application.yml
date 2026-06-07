@@ -52,6 +52,9 @@ gcp:
     bucket: ${GCS_BUCKET:lims-documents}
     # GCS credentials: uses Application Default Credentials on Cloud Run
     # Locally: set GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+  vertexai:
+    location: ${VERTEX_AI_LOCATION:us-central1}
+    model: ${GEMINI_MODEL:gemini-1.5-flash}
 
 # Actuator - expose health, metrics, prometheus, info, loggers
 management:

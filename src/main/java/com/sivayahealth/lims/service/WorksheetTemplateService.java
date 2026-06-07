@@ -1,5 +1,7 @@
 package com.sivayahealth.lims.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sivayahealth.lims.dto.worksheet.*;
 import com.sivayahealth.lims.entity.*;
 import com.sivayahealth.lims.exception.LimsException;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +30,7 @@ public class WorksheetTemplateService {
     private final TenantRepository            tenantRepo;
     private final BranchRepository            branchRepo;
     private final DocumentMasterRepository    documentMasterRepo;
+    private final ObjectMapper                objectMapper;
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
@@ -173,4 +177,52 @@ public class WorksheetTemplateService {
             r.setCreatedById(t.getCreatedBy().getId());
         return r;
     }
+
+    public WorksheetExecutionView toExecutionView(Long tenantId, Long templateId) {
+        WorksheetTemplate t = loadTemplate(tenantId, templateId);
+        WorksheetExecutionView view = new WorksheetExecutionView();
+        view.setTemplateId(t.getTemplateId());
+        view.setTemplateName(t.getTemplateName());
+        view.setStatus(t.getStatus());
+        view.setVersion(t.getVersion());
+
+        List<WorksheetExecutionView.ExecutionSection> sections = new ArrayList<>();
+        if (t.getTemplateJson() != null && !t.getTemplateJson().isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(t.getTemplateJson());
+                for (JsonNode sec : root.path("sections")) {
+                    WorksheetExecutionView.ExecutionSection es = new WorksheetExecutionView.ExecutionSection();
+                    es.setSectionName(sec.path("sectionName").asText("Section"));
+                    List<WorksheetExecutionView.ExecutionGroup> groups = new ArrayList<>();
+                    for (JsonNode grp : sec.path("slotGroups")) {
+                        WorksheetExecutionView.ExecutionGroup eg = new WorksheetExecutionView.ExecutionGroup();
+                        eg.setGroupName(grp.path("groupName").asText("Group"));
+                        List<WorksheetExecutionView.ExecutionSlot> slots = new ArrayList<>();
+                        for (JsonNode slot : grp.path("slots")) {
+                            WorksheetExecutionView.ExecutionSlot es2 = new WorksheetExecutionView.ExecutionSlot();
+                            es2.setSlotKey(slot.path("slotKey").asText());
+                            es2.setLabel(slot.path("label").asText());
+                            es2.setType(slot.path("type").asText("TEXT"));
+                            es2.setUnit(slot.path("unit").isNull() ? null : slot.path("unit").asText(null));
+                            es2.setRequired(slot.path("required").asBoolean(false));
+                            List<String> options = new ArrayList<>();
+                            for (JsonNode opt : slot.path("options")) options.add(opt.asText());
+                            es2.setOptions(options.isEmpty() ? null : options);
+                            es2.setCurrentValue(null);
+                            slots.add(es2);
+                        }
+                        eg.setSlots(slots);
+                        groups.add(eg);
+                    }
+                    es.setSlotGroups(groups);
+                    sections.add(es);
+                }
+            } catch (Exception e) {
+                log.warn("Could not parse templateJson for execution view: {}", e.getMessage());
+            }
+        }
+        view.setSections(sections);
+        return view;
+    }
 }
+

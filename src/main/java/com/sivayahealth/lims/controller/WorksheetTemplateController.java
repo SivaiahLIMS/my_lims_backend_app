@@ -6,13 +6,18 @@ import com.sivayahealth.lims.entity.WorksheetSlotGroupValue;
 import com.sivayahealth.lims.entity.WorksheetTimerLog;
 import com.sivayahealth.lims.security.LimsUserDetails;
 import com.sivayahealth.lims.service.TimerService;
+import com.sivayahealth.lims.service.WorksheetAiService;
+import com.sivayahealth.lims.service.WorksheetExportService;
 import com.sivayahealth.lims.service.WorksheetLifecycleService;
 import com.sivayahealth.lims.service.WorksheetTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,8 +37,21 @@ public class WorksheetTemplateController {
     private final WorksheetTemplateService  templateService;
     private final WorksheetLifecycleService lifecycleService;
     private final TimerService              timerService;
+    private final WorksheetAiService        worksheetAiService;
+    private final WorksheetExportService    exportService;
 
     // ── Template CRUD ─────────────────────────────────────────────────────────
+
+    @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('WORKSHEET_CREATE')")
+    @Operation(summary = "Auto-generate a DRAFT worksheet template via Gemini LLM")
+    public ResponseEntity<WorksheetTemplateResponse> generate(
+            @AuthenticationPrincipal LimsUserDetails actor,
+            @RequestBody GenerateTemplateRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(worksheetAiService.generateTemplate(
+                        actor.getTenantId(), actor.getUser().getId(), req));
+    }
 
     @PostMapping
     @PreAuthorize("hasAuthority('WORKSHEET_CREATE')")
@@ -63,6 +81,31 @@ public class WorksheetTemplateController {
             @PathVariable Long templateId) {
         return ResponseEntity.ok(
                 templateService.toResponse(templateService.get(actor.getTenantId(), templateId)));
+    }
+
+    @GetMapping("/{templateId}/export/docx")
+    @PreAuthorize("hasAuthority('WORKSHEET_VIEW')")
+    @Operation(summary = "Download worksheet template as a Word document (DOCX)")
+    public ResponseEntity<byte[]> exportDocx(
+            @AuthenticationPrincipal LimsUserDetails actor,
+            @PathVariable Long templateId) {
+        byte[] docx = exportService.exportDocx(actor.getTenantId(), templateId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+        headers.setContentDisposition(
+                ContentDisposition.attachment().filename("worksheet-template-" + templateId + ".docx").build());
+        return ResponseEntity.ok().headers(headers).body(docx);
+    }
+
+    @GetMapping("/{templateId}/execution-view")
+    @PreAuthorize("hasAuthority('WORKSHEET_VIEW')")
+    @Operation(summary = "Get analyst execution view — structured JSON for the UI form renderer")
+    public ResponseEntity<WorksheetExecutionView> executionView(
+            @AuthenticationPrincipal LimsUserDetails actor,
+            @PathVariable Long templateId) {
+        return ResponseEntity.ok(
+                templateService.toExecutionView(actor.getTenantId(), templateId));
     }
 
     @PutMapping("/{templateId}")
