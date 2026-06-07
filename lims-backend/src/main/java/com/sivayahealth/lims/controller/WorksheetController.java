@@ -255,7 +255,7 @@ public class WorksheetController {
             @RequestHeader("X-Branch-Id") Long branchId,
             @RequestBody(required = false) ReviewWorksheetRequest body,
             @AuthenticationPrincipal LimsUserDetails u) {
-        String comments = body != null ? body.getComments() : null;
+        String comments = body != null ? body.getReviewNote() : null;
         return ResponseEntity.ok(
                 worksheetService.approve(u.getTenantId(), branchId, worksheetId,
                         u.getUser().getId(), comments));
@@ -274,7 +274,7 @@ public class WorksheetController {
             @RequestHeader("X-Branch-Id") Long branchId,
             @RequestBody(required = false) ReviewWorksheetRequest body,
             @AuthenticationPrincipal LimsUserDetails u) {
-        String comments = body != null ? body.getComments() : null;
+        String comments = body != null ? body.getReviewNote() : null;
         return ResponseEntity.ok(
                 worksheetService.reject(u.getTenantId(), branchId, worksheetId,
                         u.getUser().getId(), comments));
@@ -293,7 +293,7 @@ public class WorksheetController {
             @RequestHeader("X-Branch-Id") Long branchId,
             @RequestBody(required = false) ReviewWorksheetRequest body,
             @AuthenticationPrincipal LimsUserDetails u) {
-        String comments = body != null ? body.getComments() : null;
+        String comments = body != null ? body.getReviewNote() : null;
         return ResponseEntity.ok(
                 worksheetService.close(u.getTenantId(), branchId, worksheetId,
                         u.getUser().getId(), comments));

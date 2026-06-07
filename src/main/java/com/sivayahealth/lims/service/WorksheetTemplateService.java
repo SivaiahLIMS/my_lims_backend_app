@@ -168,7 +168,7 @@ public class WorksheetTemplateService {
         r.setReviewedAt(t.getReviewedAt());
         r.setApprovedAt(t.getApprovedAt());
         if (t.getSourceDocument() != null)
-            r.setSourceDocumentId(t.getSourceDocument().getDocumentId());
+            r.setSourceDocumentId(t.getSourceDocument().getId());
         if (t.getReviewedBy() != null)
             r.setReviewedById(t.getReviewedBy().getId());
         if (t.getApprovedBy() != null)
