@@ -6,6 +6,7 @@ import com.sivayahealth.lims.entity.WorksheetSlotGroupValue;
 import com.sivayahealth.lims.entity.WorksheetTimerLog;
 import com.sivayahealth.lims.security.LimsUserDetails;
 import com.sivayahealth.lims.service.TimerService;
+import com.sivayahealth.lims.service.WorksheetAiService;
 import com.sivayahealth.lims.service.WorksheetLifecycleService;
 import com.sivayahealth.lims.service.WorksheetTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,8 +33,20 @@ public class WorksheetTemplateController {
     private final WorksheetTemplateService  templateService;
     private final WorksheetLifecycleService lifecycleService;
     private final TimerService              timerService;
+    private final WorksheetAiService        worksheetAiService;
 
     // ── Template CRUD ─────────────────────────────────────────────────────────
+
+    @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('WORKSHEET_CREATE')")
+    @Operation(summary = "Auto-generate a DRAFT worksheet template via Gemini LLM")
+    public ResponseEntity<WorksheetTemplateResponse> generate(
+            @AuthenticationPrincipal LimsUserDetails actor,
+            @RequestBody GenerateTemplateRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(worksheetAiService.generateTemplate(
+                        actor.getTenantId(), actor.getUser().getId(), req));
+    }
 
     @PostMapping
     @PreAuthorize("hasAuthority('WORKSHEET_CREATE')")

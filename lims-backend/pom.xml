@@ -171,6 +171,12 @@
       <artifactId>google-cloud-storage</artifactId>
     </dependency>
 
+    <!-- Vertex AI (Gemini) for LLM worksheet template generation -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-vertexai</artifactId>
+    </dependency>
+
     <!-- Google Cloud Logging (Log4j2 appender for Cloud Logging) -->
     <dependency>
       <groupId>com.google.cloud</groupId>
