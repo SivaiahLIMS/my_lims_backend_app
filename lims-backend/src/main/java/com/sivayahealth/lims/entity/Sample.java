@@ -71,6 +71,9 @@ public class Sample {
     @Column(name = "storage_location_id")
     private Long storageLocationId;
 
+    @Column(name = "ar_number", length = 30)
+    private String arNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private AppUser createdBy;

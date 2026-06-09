@@ -25,6 +25,7 @@ public class WorksheetService {
     private final DocumentMasterRepository documentMasterRepo;
     private final ChemicalMasterRepository chemicalMasterRepo;
     private final InstrumentMasterRepository instrumentMasterRepo;
+    private final SampleRepository sampleRepo;
 
     // ── List / Search ─────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ public class WorksheetService {
 
     @Transactional
     public WorksheetMaster create(Long tenantId, Long branchId, Long userId,
+                                  Long sampleId, Long assignedToUserId,
                                   WorksheetMaster data) {
         Tenant tenant = tenantRepo.findById(tenantId)
                 .orElseThrow(() -> LimsException.notFound("Tenant not found"));
@@ -76,6 +78,19 @@ public class WorksheetService {
                 .orElseThrow(() -> LimsException.notFound("Branch not found"));
         AppUser creator = userRepo.findById(userId)
                 .orElseThrow(() -> LimsException.notFound("User not found"));
+
+        if (sampleId != null) {
+            Sample sample = sampleRepo.findById(sampleId)
+                    .orElseThrow(() -> LimsException.notFound("Sample not found"));
+            data.setSample(sample);
+        }
+
+        if (assignedToUserId != null) {
+            AppUser assignee = userRepo.findById(assignedToUserId)
+                    .orElseThrow(() -> LimsException.notFound("Assignee user not found"));
+            data.setAssignedTo(assignee);
+            data.setAssignedBy(creator);
+        }
 
         data.setTenant(tenant);
         data.setBranch(branch);

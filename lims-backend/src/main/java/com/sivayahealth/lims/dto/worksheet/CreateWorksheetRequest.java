@@ -8,4 +8,6 @@ public class CreateWorksheetRequest {
     private String batchNo;
     private Long templateId;
     private Long documentVersionId;
+    private Long sampleId;
+    private Long assignedToUserId;
 }

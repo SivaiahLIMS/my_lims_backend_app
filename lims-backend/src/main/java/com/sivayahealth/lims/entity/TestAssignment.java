@@ -30,4 +30,8 @@ public class TestAssignment {
 
     @Column(name = "due_date")
     private LocalDateTime dueDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "worksheet_id")
+    private WorksheetMaster worksheet;
 }

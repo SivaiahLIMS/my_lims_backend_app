@@ -24,6 +24,8 @@ public interface WorksheetMasterRepository extends JpaRepository<WorksheetMaster
     List<WorksheetMaster> findByTenantIdAndBranchIdAndAssignedTo_Id(
             Long tenantId, Long branchId, Long assignedToId);
 
+    List<WorksheetMaster> findBySample_Id(Long sampleId);
+
     /**
      * Rich search with all optional filters, supporting the history screen.
      * All parameters are optional — pass null to skip that filter.

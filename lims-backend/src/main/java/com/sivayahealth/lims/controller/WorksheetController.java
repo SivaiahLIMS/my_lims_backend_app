@@ -156,7 +156,8 @@ public class WorksheetController {
         WorksheetMaster data = new WorksheetMaster();
         data.setBatchNo(body.getBatchNo());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(worksheetService.create(u.getTenantId(), branchId, u.getUser().getId(), data));
+                .body(worksheetService.create(u.getTenantId(), branchId, u.getUser().getId(),
+                        body.getSampleId(), body.getAssignedToUserId(), data));
     }
 
     @PutMapping("/{worksheetId}")
@@ -523,5 +524,16 @@ public class WorksheetController {
                 worksheetDocumentService.reviewResult(
                         u.getTenantId(), branchId, worksheetId, testCaseId,
                         u.getUser().getId(), body.getPassFail(), body.getComments()));
+    }
+
+    @GetMapping("/{worksheetId}/field-audit")
+    @PreAuthorize("hasAuthority('WORKSHEET_VIEW')")
+    @Operation(summary = "Get immutable field value audit trail for a worksheet (21 CFR Part 11)",
+               description = "Requires: WORKSHEET_VIEW")
+    public ResponseEntity<List<com.sivayahealth.lims.entity.WorksheetFieldValueAudit>> getFieldAudit(
+            @PathVariable Long worksheetId,
+            @RequestHeader("X-Branch-Id") Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(worksheetDocumentService.getFieldAuditTrail(worksheetId));
     }
 }

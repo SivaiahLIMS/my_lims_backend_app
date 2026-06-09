@@ -70,6 +70,10 @@ public class WorksheetMaster {
     private WorksheetTemplate worksheetTemplate;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sample_id")
+    private Sample sample;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "retest_of_worksheet_id")
     private WorksheetMaster retestOfWorksheet;
 

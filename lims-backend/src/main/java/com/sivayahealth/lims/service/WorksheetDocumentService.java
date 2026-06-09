@@ -32,6 +32,8 @@ public class WorksheetDocumentService {
     private final InstrumentMasterRepository           instrumentRepo;
     private final InventoryReagentLotRepository        reagentLotRepo;
     private final AuditService                         auditService;
+    private final WorksheetFieldValueAuditRepository   fieldValueAuditRepo;
+    private final QaService                             qaService;
 
     private final ObjectMapper objectMapper;
 
@@ -146,6 +148,17 @@ public class WorksheetDocumentService {
         WorksheetFieldValue saved = fieldValueRepo.save(fv);
 
         String newValue = numericValue != null ? numericValue.toPlainString() : fv.getTextValue();
+
+        fieldValueAuditRepo.save(WorksheetFieldValueAudit.builder()
+                .worksheetId(worksheetId)
+                .slotId(slotId)
+                .testCaseId(slot.getTestCase() != null ? slot.getTestCase().getTestCaseId() : null)
+                .oldValue(oldValue)
+                .newValue(newValue)
+                .changedBy(userId)
+                .changeType(existing.isPresent() ? "UPDATE" : "INSERT")
+                .build());
+
         auditService.log(tenantId, userId, "WORKSHEET_FIELD_VALUE", saved.getValueId(),
                 existing.isPresent() ? "UPDATE" : "INSERT", oldValue, newValue);
 
@@ -291,6 +304,22 @@ public class WorksheetDocumentService {
         auditService.log(tenantId, userId, "WORKSHEET_TEST_CASE_RESULT", saved.getResultId(),
                 "REVIEW", oldPassFail, passFail);
 
+        // Auto-create OOS case when reviewer confirms FAIL (not a re-confirmation of existing FAIL)
+        if ("FAIL".equals(passFail) && !"FAIL".equals(oldPassFail)) {
+            WorksheetMaster worksheet = saved.getWorksheet();
+            if (worksheet.getSample() != null) {
+                com.sivayahealth.lims.dto.qa.CreateOosRequest oosReq =
+                        new com.sivayahealth.lims.dto.qa.CreateOosRequest();
+                oosReq.setBranchId(branchId);
+                oosReq.setSampleId(worksheet.getSample().getId());
+                oosReq.setTestId(testCaseId);
+                oosReq.setOosType("OOS");
+                oosReq.setDescription("Auto-raised: test case " + testCaseId
+                        + " on worksheet " + worksheetId + " reviewed as FAIL");
+                qaService.createOos(tenantId, branchId, oosReq, userId);
+            }
+        }
+
         return saved;
     }
 
@@ -321,6 +350,10 @@ public class WorksheetDocumentService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    public List<WorksheetFieldValueAudit> getFieldAuditTrail(Long worksheetId) {
+        return fieldValueAuditRepo.findByWorksheetIdOrderByChangedAtDesc(worksheetId);
+    }
 
     private WorksheetMaster loadWorksheet(Long tenantId, Long branchId, Long worksheetId) {
         WorksheetMaster w = worksheetRepo.findById(worksheetId)

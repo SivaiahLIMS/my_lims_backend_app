@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Year;
 import java.util.List;
 
 @Service
@@ -33,6 +34,7 @@ public class SampleService {
     private final ReleaseDecisionRepository releaseDecisionRepository;
     private final SampleAttachmentRepository sampleAttachmentRepository;
     private final SampleAuditTrailRepository sampleAuditTrailRepository;
+    private final ArSequenceRepository arSequenceRepository;
 
     // ---- Sample Registration & Lifecycle ----
 
@@ -64,6 +66,7 @@ public class SampleService {
         Sample sample = Sample.builder()
                 .tenant(tenant).branch(branch)
                 .sampleNo(req.getSampleNo())
+                .arNumber(generateArNumber(tenantId))
                 .sampleCode(req.getSampleCode())
                 .sampleTypeRef(sampleTypeRef)
                 .sampleType(req.getSampleType())
@@ -589,5 +592,16 @@ public class SampleService {
                 .performedAt(LocalDateTime.now())
                 .build();
         sampleAuditTrailRepository.save(trail);
+    }
+
+    @Transactional
+    public String generateArNumber(Long tenantId) {
+        int year = Year.now().getValue();
+        ArSequence seq = arSequenceRepository.findByTenantIdAndYear(tenantId, year)
+                .orElseGet(() -> arSequenceRepository.save(
+                        ArSequence.builder().tenantId(tenantId).year(year).lastSeq(0L).build()));
+        seq.setLastSeq(seq.getLastSeq() + 1);
+        arSequenceRepository.save(seq);
+        return String.format("AR-%d-%06d", year, seq.getLastSeq());
     }
 }

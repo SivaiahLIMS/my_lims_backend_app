@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface TestAssignmentRepository extends JpaRepository<TestAssignment, Long> {
     Optional<TestAssignment> findBySampleTestId(Long sampleTestId);
     List<TestAssignment> findByAnalystId(Long analystId);
+    List<TestAssignment> findBySampleTest_Sample_Id(Long sampleId);
 }
