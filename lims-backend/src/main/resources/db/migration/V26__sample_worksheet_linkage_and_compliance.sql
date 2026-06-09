@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS ar_sequence (
 
 -- ar_number on sample
 ALTER TABLE sample
-    ADD COLUMN IF NOT EXISTS ar_number VARCHAR(30);
+    ADD COLUMN IF NOT EXISTS ar_number VARCHAR(60);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sample_ar_number
     ON sample(tenant_id, ar_number)

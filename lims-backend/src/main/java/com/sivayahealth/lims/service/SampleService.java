@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
@@ -66,7 +67,7 @@ public class SampleService {
         Sample sample = Sample.builder()
                 .tenant(tenant).branch(branch)
                 .sampleNo(req.getSampleNo())
-                .arNumber(generateArNumber(tenantId))
+                .arNumber(generateArNumber(tenantId, branch.getId()))
                 .sampleCode(req.getSampleCode())
                 .sampleTypeRef(sampleTypeRef)
                 .sampleType(req.getSampleType())
@@ -594,14 +595,11 @@ public class SampleService {
         sampleAuditTrailRepository.save(trail);
     }
 
-    @Transactional
-    public String generateArNumber(Long tenantId) {
+    public String generateArNumber(Long tenantId, Long branchId) {
         int year = Year.now().getValue();
-        ArSequence seq = arSequenceRepository.findByTenantIdAndYear(tenantId, year)
-                .orElseGet(() -> arSequenceRepository.save(
-                        ArSequence.builder().tenantId(tenantId).year(year).lastSeq(0L).build()));
-        seq.setLastSeq(seq.getLastSeq() + 1);
-        arSequenceRepository.save(seq);
-        return String.format("AR-%d-%06d", year, seq.getLastSeq());
+        Instant now = Instant.now();
+        long epochSeconds = now.getEpochSecond();
+        int nanos = now.getNano();
+        return String.format("AR-%d-%d-%d-%d-%d", year, tenantId, branchId, epochSeconds, nanos);
     }
 }

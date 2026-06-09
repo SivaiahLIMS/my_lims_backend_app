@@ -71,7 +71,7 @@ public class Sample {
     @Column(name = "storage_location_id")
     private Long storageLocationId;
 
-    @Column(name = "ar_number", length = 30)
+    @Column(name = "ar_number", length = 60)
     private String arNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
