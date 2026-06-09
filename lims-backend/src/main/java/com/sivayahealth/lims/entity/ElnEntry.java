@@ -25,6 +25,10 @@ public class ElnEntry {
     @JoinColumn(name = "worksheet_execution_id")
     private WorksheetExecution worksheetExecution;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "worksheet_master_id")
+    private WorksheetMaster worksheetMaster;
+
     private String title;
 
     @Column(columnDefinition = "TEXT")

@@ -1,7 +1,6 @@
 package com.sivayahealth.lims.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sivayahealth.lims.entity.*;
 import com.sivayahealth.lims.exception.LimsException;
 import com.sivayahealth.lims.repository.*;
@@ -12,40 +11,32 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Handles the analyst-facing worksheet execution flow:
- *   - Render template (blocks + slots) for a worksheet
- *   - Save / upsert a field value
- *   - Compute formula result for a test case once all slots are filled
- *   - Review a test case result (pass/fail + comments)
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class WorksheetDocumentService {
 
-    private final WorksheetMasterRepository        worksheetRepo;
-    private final DocumentTestCaseRepository       testCaseRepo;
-    private final DocumentTemplateBlockRepository  blockRepo;
-    private final DocumentFieldSlotRepository      slotRepo;
-    private final WorksheetFieldValueRepository    fieldValueRepo;
-    private final WorksheetTestCaseResultRepository resultRepo;
-    private final AppUserRepository                userRepo;
+    private final WorksheetMasterRepository            worksheetRepo;
+    private final DocumentTestCaseRepository           testCaseRepo;
+    private final DocumentTemplateBlockRepository      blockRepo;
+    private final DocumentFieldSlotRepository          slotRepo;
+    private final WorksheetFieldValueRepository        fieldValueRepo;
+    private final WorksheetTestCaseResultRepository    resultRepo;
+    private final AppUserRepository                    userRepo;
+    private final WorksheetValidationEventRepository   validationEventRepo;
+    private final InstrumentMasterRepository           instrumentRepo;
+    private final InventoryReagentLotRepository        reagentLotRepo;
+    private final AuditService                         auditService;
 
     private final ObjectMapper objectMapper;
 
     // ── Template rendering ────────────────────────────────────────────────────
 
-    /**
-     * Returns the full document structure for a worksheet — ordered test cases,
-     * each with ordered blocks and their field slots. Also includes any saved
-     * field values so the analyst UI can pre-populate inputs.
-     */
     @Transactional(readOnly = true)
     public WorksheetTemplateView getTemplateView(Long tenantId, Long branchId, Long worksheetId) {
         WorksheetMaster worksheet = loadWorksheet(tenantId, branchId, worksheetId);
@@ -79,10 +70,6 @@ public class WorksheetDocumentService {
 
     // ── Field value save / upsert ─────────────────────────────────────────────
 
-    /**
-     * Save or update a single field slot value for an analyst.
-     * Supports upsert: if the analyst already filled this slot, updates it.
-     */
     @Transactional
     public WorksheetFieldValue saveFieldValue(Long tenantId, Long branchId,
                                                Long worksheetId, Long userId,
@@ -104,6 +91,10 @@ public class WorksheetDocumentService {
         Optional<WorksheetFieldValue> existing =
                 fieldValueRepo.findByWorksheet_WorksheetIdAndSlot_SlotId(worksheetId, slotId);
 
+        String oldValue = existing.map(v ->
+                v.getNumericValue() != null ? v.getNumericValue().toPlainString() : v.getTextValue()
+        ).orElse(null);
+
         WorksheetFieldValue fv = existing.orElseGet(() -> WorksheetFieldValue.builder()
                 .worksheet(worksheet)
                 .slot(slot)
@@ -117,6 +108,33 @@ public class WorksheetDocumentService {
         fv.setQualifier(qualifier != null ? qualifier : "EXACT");
         fv.setComment(comment);
 
+        // Validate instrument active status when slot is INSTRUMENT_SELECT type
+        if ("INSTRUMENT_SELECT".equals(slot.getFieldType()) && fv.getRefId() != null) {
+            InstrumentMaster instrument = instrumentRepo.findById(fv.getRefId())
+                    .orElseThrow(() -> LimsException.notFound("Instrument not found"));
+            if (!"ACTIVE".equalsIgnoreCase(instrument.getStatus())) {
+                throw LimsException.badRequest(
+                        "Instrument '" + instrument.getName() + "' is not ACTIVE (status: "
+                                + instrument.getStatus() + ")");
+            }
+        }
+
+        // Validate chemical lot not expired and available when slot is CHEMICAL_SELECT type
+        if ("CHEMICAL_SELECT".equals(slot.getFieldType()) && fv.getRefId() != null) {
+            InventoryReagentLot lot = reagentLotRepo.findById(fv.getRefId())
+                    .orElseThrow(() -> LimsException.notFound("Reagent lot not found"));
+            if (lot.getExpiryDate() != null && lot.getExpiryDate().isBefore(LocalDate.now())) {
+                throw LimsException.badRequest(
+                        "Reagent lot '" + lot.getLotNumber() + "' is expired (expiry: "
+                                + lot.getExpiryDate() + ")");
+            }
+            if (!"AVAILABLE".equalsIgnoreCase(lot.getStatus())) {
+                throw LimsException.badRequest(
+                        "Reagent lot '" + lot.getLotNumber() + "' is not available (status: "
+                                + lot.getStatus() + ")");
+            }
+        }
+
         if (existing.isEmpty()) {
             fv.setEnteredBy(analyst);
             fv.setEnteredAt(LocalDateTime.now());
@@ -125,17 +143,17 @@ public class WorksheetDocumentService {
             fv.setModifiedAt(LocalDateTime.now());
         }
 
-        return fieldValueRepo.save(fv);
+        WorksheetFieldValue saved = fieldValueRepo.save(fv);
+
+        String newValue = numericValue != null ? numericValue.toPlainString() : fv.getTextValue();
+        auditService.log(tenantId, userId, "WORKSHEET_FIELD_VALUE", saved.getValueId(),
+                existing.isPresent() ? "UPDATE" : "INSERT", oldValue, newValue);
+
+        return saved;
     }
 
     // ── Formula computation ───────────────────────────────────────────────────
 
-    /**
-     * Evaluates the formula for a test case by substituting all slot values
-     * and computing the result. Stores it in worksheet_test_case_result.
-     *
-     * Requires all slots to be filled; throws if any are missing.
-     */
     @Transactional
     public WorksheetTestCaseResult computeResult(Long tenantId, Long branchId,
                                                   Long worksheetId,
@@ -155,7 +173,6 @@ public class WorksheetDocumentService {
                 fieldValueRepo.findByWorksheet_WorksheetIdAndTestCase_TestCaseId(
                         worksheetId, testCaseId);
 
-        // Map slotId → value
         Map<Long, BigDecimal> slotValueMap = new HashMap<>();
         for (WorksheetFieldValue v : values) {
             if (v.getNumericValue() != null) {
@@ -163,10 +180,9 @@ public class WorksheetDocumentService {
             }
         }
 
-        // Check all slots are filled
         List<String> missing = new ArrayList<>();
         for (DocumentFieldSlot slot : slots) {
-            if (!slotValueMap.containsKey(slot.getSlotId())) {
+            if ("NUMBER".equals(slot.getFieldType()) && !slotValueMap.containsKey(slot.getSlotId())) {
                 missing.add(slot.getFieldVariable() + " (" + slot.getLabel() + ")");
             }
         }
@@ -174,10 +190,11 @@ public class WorksheetDocumentService {
             throw LimsException.badRequest("Missing values for: " + String.join(", ", missing));
         }
 
-        // Build variable → value map using field_variable (A, B, C...)
         Map<String, BigDecimal> varValues = new HashMap<>();
         for (DocumentFieldSlot slot : slots) {
-            varValues.put(slot.getFieldVariable(), slotValueMap.get(slot.getSlotId()));
+            if (slotValueMap.containsKey(slot.getSlotId())) {
+                varValues.put(slot.getFieldVariable(), slotValueMap.get(slot.getSlotId()));
+            }
         }
 
         String expression = testCase.getFormulaExpression();
@@ -188,9 +205,20 @@ public class WorksheetDocumentService {
         String substituted = substituteExpression(expression, varValues);
         BigDecimal computed = evaluate(substituted);
 
+        // Auto-determine passFail from OOS validation events for this test case
+        List<WorksheetValidationEvent> events =
+                validationEventRepo.findByWorksheetIdAndTestCaseIdOrderByValidatedAtDesc(
+                        worksheetId, testCaseId);
+        boolean hasOos = events.stream().anyMatch(e -> "OOS".equals(e.getStatus()));
+        String autoPassFail = hasOos ? "FAIL" : "PENDING";
+
         Optional<WorksheetTestCaseResult> existing =
                 resultRepo.findByWorksheet_WorksheetIdAndTestCase_TestCaseId(
                         worksheetId, testCaseId);
+
+        String oldComputed = existing
+                .map(r -> r.getComputedResult() != null ? r.getComputedResult().toPlainString() : null)
+                .orElse(null);
 
         WorksheetTestCaseResult result = existing.orElseGet(() ->
                 WorksheetTestCaseResult.builder()
@@ -203,18 +231,25 @@ public class WorksheetDocumentService {
         result.setFormulaSubstituted(substituted);
         result.setComputedResult(computed);
         result.setResultUnit(resultUnit);
-        result.setPassFail("PENDING");
+        result.setPassFail(autoPassFail);
+        if (hasOos) {
+            result.setReviewComments(
+                    "Auto-set to FAIL: OOS validation event detected. Reviewer must provide justification to override.");
+        }
         result.setComputedBy(analyst);
         result.setComputedAt(LocalDateTime.now());
 
-        return resultRepo.save(result);
+        WorksheetTestCaseResult saved = resultRepo.save(result);
+
+        auditService.log(tenantId, userId, "WORKSHEET_TEST_CASE_RESULT", saved.getResultId(),
+                existing.isPresent() ? "RECOMPUTE" : "COMPUTE", oldComputed,
+                computed.toPlainString());
+
+        return saved;
     }
 
     // ── Result review ─────────────────────────────────────────────────────────
 
-    /**
-     * Reviewer marks a test case result as PASS or FAIL with optional comments.
-     */
     @Transactional
     public WorksheetTestCaseResult reviewResult(Long tenantId, Long branchId,
                                                  Long worksheetId,
@@ -236,25 +271,35 @@ public class WorksheetDocumentService {
             throw LimsException.badRequest("passFail must be PASS or FAIL");
         }
 
+        // Justification required when overriding an auto-FAIL (OOS) to PASS
+        if ("PASS".equals(passFail) && "FAIL".equals(result.getPassFail())) {
+            if (comments == null || comments.isBlank()) {
+                throw LimsException.badRequest(
+                        "A justification comment is required when overriding a FAIL result to PASS");
+            }
+        }
+
+        String oldPassFail = result.getPassFail();
+
         result.setPassFail(passFail);
         result.setReviewedBy(reviewer);
         result.setReviewedAt(LocalDateTime.now());
         result.setReviewComments(comments);
-        return resultRepo.save(result);
+
+        WorksheetTestCaseResult saved = resultRepo.save(result);
+
+        auditService.log(tenantId, userId, "WORKSHEET_TEST_CASE_RESULT", saved.getResultId(),
+                "REVIEW", oldPassFail, passFail);
+
+        return saved;
     }
 
     // ── Expression evaluation ─────────────────────────────────────────────────
 
-    /**
-     * Substitutes variable names (A, B, C...) with their numeric values
-     * in the formula expression string.
-     */
     private String substituteExpression(String expression, Map<String, BigDecimal> varValues) {
-        // Sort by length descending to avoid AA being replaced by two A substitutions
         List<String> vars = varValues.keySet().stream()
                 .sorted(Comparator.comparingInt(String::length).reversed())
                 .toList();
-
         String result = expression;
         for (String var : vars) {
             result = result.replaceAll("\\b" + Pattern.quote(var) + "\\b",
@@ -263,20 +308,15 @@ public class WorksheetDocumentService {
         return result;
     }
 
-    /**
-     * Simple arithmetic expression evaluator supporting +, -, *, /, (, ).
-     * Uses a recursive descent parser — no external dependencies.
-     */
     private BigDecimal evaluate(String expression) {
         try {
-            // Strip non-numeric/operator characters that may remain from formula text
-            String cleaned = expression.replaceAll("[^0-9+\\-*/().E]", " ").trim();
+            // Preserve both E and e for scientific notation
+            String cleaned = expression.replaceAll("[^0-9+\\-*/().Ee]", " ").trim();
             ExprParser parser = new ExprParser(cleaned);
             return parser.parse().setScale(6, RoundingMode.HALF_UP);
         } catch (Exception e) {
             log.warn("Formula evaluation failed for expression '{}': {}", expression, e.getMessage());
-            throw LimsException.badRequest(
-                    "Could not evaluate formula: " + e.getMessage());
+            throw LimsException.badRequest("Could not evaluate formula: " + e.getMessage());
         }
     }
 
@@ -307,8 +347,8 @@ public class WorksheetDocumentService {
     // ── Arithmetic expression parser ──────────────────────────────────────────
 
     private static class ExprParser {
-        private final String   input;
-        private       int      pos = 0;
+        private final String input;
+        private int pos = 0;
 
         ExprParser(String input) { this.input = input.trim(); }
 
@@ -363,7 +403,8 @@ public class WorksheetDocumentService {
             skipWs();
             int start = pos;
             if (pos < input.length() && (peek() == '-' || peek() == '+')) pos++;
-            while (pos < input.length() && (Character.isDigit(peek()) || peek() == '.' || peek() == 'E' || peek() == 'e')) pos++;
+            while (pos < input.length() && (Character.isDigit(peek()) || peek() == '.'
+                    || peek() == 'E' || peek() == 'e')) pos++;
             String num = input.substring(start, pos).trim();
             if (num.isEmpty()) throw new RuntimeException("Expected number at position " + start);
             return new BigDecimal(num);

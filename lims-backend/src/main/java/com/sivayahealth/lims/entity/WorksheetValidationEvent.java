@@ -18,6 +18,9 @@ public class WorksheetValidationEvent {
     @Column(name = "worksheet_id")
     private Long worksheetId;
 
+    @Column(name = "test_case_id")
+    private Long testCaseId;
+
     @Column(name = "slot_id")
     private Long slotId;
 

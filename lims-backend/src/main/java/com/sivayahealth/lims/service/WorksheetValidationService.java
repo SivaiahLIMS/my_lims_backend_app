@@ -148,6 +148,7 @@ public class WorksheetValidationService {
 
         WorksheetValidationEvent event = WorksheetValidationEvent.builder()
                 .worksheetId(worksheetId)
+                .testCaseId(slot.getTestCase() != null ? slot.getTestCase().getTestCaseId() : null)
                 .slotId(slotId)
                 .value(req.getValue())
                 .unit(req.getUnit())
