@@ -155,4 +155,23 @@ public class WorksheetValidationController {
             @PathVariable Long worksheetId) {
         return ResponseEntity.ok(validationService.getValidationEvents(worksheetId));
     }
+
+    @GetMapping("/worksheets/{worksheetId}/fields/{fieldId}/validation-events")
+    @PreAuthorize("hasAuthority('VALIDATION_RULE_VIEW')")
+    @Operation(
+        summary = "Get OOS/OOT validation events for a specific field in a worksheet",
+        description = "Requires: VALIDATION_RULE_VIEW. " +
+                      "fieldId is the slot_id. " +
+                      "Returns all validation calls made on this specific field, ordered most-recent first."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Event list returned"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    public ResponseEntity<List<WorksheetValidationEvent>> getValidationEventsForField(
+            @PathVariable Long worksheetId,
+            @PathVariable Long fieldId) {
+        return ResponseEntity.ok(validationService.getValidationEventsForField(worksheetId, fieldId));
+    }
 }

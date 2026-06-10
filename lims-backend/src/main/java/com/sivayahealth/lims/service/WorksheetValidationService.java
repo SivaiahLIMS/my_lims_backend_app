@@ -36,7 +36,7 @@ public class WorksheetValidationService {
                                                     UpsertValidationRuleRequest req,
                                                     Long userId) {
         DocumentFieldSlot slot = slotRepository.findById(slotId)
-                .orElseThrow(() -> new LimsException("Field slot not found: " + slotId));
+                .orElseThrow(() -> LimsException.notFound("Field slot not found: " + slotId));
 
         validateLimits(req);
 
@@ -132,15 +132,15 @@ public class WorksheetValidationService {
     public ValidateFieldResponse validateForWorksheet(Long worksheetId, Long slotId,
                                                        ValidateFieldRequest req, Long userId) {
         WorksheetMaster worksheet = worksheetRepository.findById(worksheetId)
-                .orElseThrow(() -> new LimsException("Worksheet not found: " + worksheetId));
+                .orElseThrow(() -> LimsException.notFound("Worksheet not found: " + worksheetId));
 
         DocumentFieldSlot slot = slotRepository.findById(slotId)
-                .orElseThrow(() -> new LimsException("Field slot not found: " + slotId));
+                .orElseThrow(() -> LimsException.notFound("Field slot not found: " + slotId));
 
         if (worksheet.getDocumentVersion() != null
                 && !slot.getDocumentVersion().getId()
                         .equals(worksheet.getDocumentVersion().getId())) {
-            throw new LimsException(
+            throw LimsException.badRequest(
                     "Slot " + slotId + " does not belong to the document version of worksheet " + worksheetId);
         }
 
@@ -168,16 +168,20 @@ public class WorksheetValidationService {
         return eventRepository.findByWorksheetIdOrderByValidatedAtDesc(worksheetId);
     }
 
+    public List<WorksheetValidationEvent> getValidationEventsForField(Long worksheetId, Long slotId) {
+        return eventRepository.findByWorksheetIdAndSlotIdOrderByValidatedAtDesc(worksheetId, slotId);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void validateLimits(UpsertValidationRuleRequest req) {
         if (req.getOotLowerLimit() != null && req.getOosLowerLimit() != null
                 && req.getOotLowerLimit().compareTo(req.getOosLowerLimit()) < 0) {
-            throw new LimsException("OOT lower limit must be >= OOS lower limit.");
+            throw LimsException.badRequest("OOT lower limit must be >= OOS lower limit.");
         }
         if (req.getOotUpperLimit() != null && req.getOosUpperLimit() != null
                 && req.getOotUpperLimit().compareTo(req.getOosUpperLimit()) > 0) {
-            throw new LimsException("OOT upper limit must be <= OOS upper limit.");
+            throw LimsException.badRequest("OOT upper limit must be <= OOS upper limit.");
         }
     }
 

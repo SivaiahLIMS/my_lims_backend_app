@@ -12,4 +12,7 @@ public interface WorksheetValidationEventRepository
 
     List<WorksheetValidationEvent> findByWorksheetIdAndTestCaseIdOrderByValidatedAtDesc(
             Long worksheetId, Long testCaseId);
+
+    List<WorksheetValidationEvent> findByWorksheetIdAndSlotIdOrderByValidatedAtDesc(
+            Long worksheetId, Long slotId);
 }
