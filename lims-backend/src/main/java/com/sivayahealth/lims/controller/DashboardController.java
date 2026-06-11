@@ -25,20 +25,20 @@ public class DashboardController {
     @GetMapping("/widgets")
     @PreAuthorize("hasAnyAuthority('WIDGET_CRITICAL_ALERTS','WIDGET_WORKLOAD','WIDGET_LOW_STOCK','WIDGET_CALIBRATION_DUE','WIDGET_OOS','WIDGET_EXECUTIVE_KPI')")
     @Operation(summary = "Get dashboard widgets data",
-               description = "Scoped by X-Branch-Id header.")
+               description = "Scoped by optional X-Branch-Id header.")
     public ResponseEntity<Map<String, Object>> getWidgets(
-            @RequestHeader("X-Branch-Id") Long branchId,
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
             @AuthenticationPrincipal LimsUserDetails u) {
-        return ResponseEntity.ok(dashboardService.getWidgets(u.getTenantId(), branchId));
+        return ResponseEntity.ok(dashboardService.getWidgets(u.getTenantId(), branchId != null ? branchId : 0L));
     }
 
     @GetMapping("/summary")
     @PreAuthorize("hasAnyAuthority('WIDGET_CRITICAL_ALERTS','WIDGET_WORKLOAD','WIDGET_LOW_STOCK','WIDGET_CALIBRATION_DUE','WIDGET_OOS','WIDGET_EXECUTIVE_KPI')")
     @Operation(summary = "Get full dashboard summary",
-               description = "Scoped by X-Branch-Id header.")
+               description = "Scoped by optional X-Branch-Id header.")
     public ResponseEntity<Map<String, Object>> getSummary(
-            @RequestHeader("X-Branch-Id") Long branchId,
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
             @AuthenticationPrincipal LimsUserDetails u) {
-        return ResponseEntity.ok(dashboardService.getDashboardData(u.getTenantId(), branchId));
+        return ResponseEntity.ok(dashboardService.getDashboardData(u.getTenantId(), branchId != null ? branchId : 0L));
     }
 }

@@ -124,6 +124,42 @@ public class UserService {
         auditService.log(tenantId, userId, "AppUser", userId, "RESET_PASSWORD", null, null);
     }
 
+    @Transactional
+    public UserResponse updateUser(Long userId, com.sivayahealth.lims.dto.user.UpdateUserRequest request, Long tenantId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> LimsException.notFound("User not found"));
+        if (request.email() != null) {
+            if (!request.email().equals(user.getEmail()) && userRepository.existsByEmail(request.email())) {
+                throw LimsException.conflict("Email already in use");
+            }
+            user.setEmail(request.email());
+        }
+        if (request.status() != null) {
+            user.setStatus(request.status());
+        }
+        userRepository.save(user);
+
+        UserProfile profile = profileRepository.findByUserId(userId).orElseGet(() -> {
+            UserProfile p = new UserProfile();
+            p.setUser(user);
+            return p;
+        });
+        if (request.firstName() != null) profile.setFirstName(request.firstName());
+        if (request.lastName() != null) profile.setLastName(request.lastName());
+        if (request.phone() != null) profile.setPhone(request.phone());
+        profileRepository.save(profile);
+
+        auditService.log(tenantId, userId, "AppUser", userId, "UPDATE", null, user.getUsername());
+        return UserResponse.from(user, profile);
+    }
+
+    @Transactional
+    public void removeRole(Long userId, Long roleId, Long tenantId) {
+        userRepository.findById(userId).orElseThrow(() -> LimsException.notFound("User not found"));
+        userRoleRepository.deleteByUserIdAndRoleId(userId, roleId);
+        auditService.log(tenantId, userId, "UserRole", userId, "REMOVE_ROLE", String.valueOf(roleId), null);
+    }
+
     /**
      * Returns every role active in the tenant, each with its full user list.
      */

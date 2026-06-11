@@ -200,4 +200,194 @@ public class AnalyticsController {
         return ResponseEntity.ok(
                 analyticsService.getConsumptionTrends(u.getTenantId(), branchId, reagentId, from, to));
     }
+
+    // ── Sample analytics ──────────────────────────────────────────────────────────
+
+    @GetMapping("/samples/inflow")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Sample inflow volume by day")
+    public ResponseEntity<Map<String, Object>> getSampleInflow(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getSampleInflow(u.getTenantId(), branchId, timeRange));
+    }
+
+    @GetMapping("/samples/pass-fail")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Sample pass vs fail rate")
+    public ResponseEntity<Map<String, Object>> getSamplePassFail(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getSamplePassFail(u.getTenantId(), branchId != null ? branchId : 0L, timeRange));
+    }
+
+    @GetMapping("/samples/oos-frequency")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "OOS case frequency and trend")
+    public ResponseEntity<Map<String, Object>> getOosFrequency(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getOosFrequency(u.getTenantId(), branchId, timeRange));
+    }
+
+    // ── User analytics ────────────────────────────────────────────────────────────
+
+    @GetMapping("/users/analyst-workload")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Analyst workload breakdown")
+    public ResponseEntity<Map<String, Object>> getAnalystWorkload(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getAnalystWorkload(u.getTenantId(), branchId != null ? branchId : 0L));
+    }
+
+    // ── Worksheet analytics ───────────────────────────────────────────────────────
+
+    @GetMapping("/worksheets/status-trend")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Worksheet execution status trend")
+    public ResponseEntity<Map<String, Object>> getWorksheetStatusTrend(
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getWorksheetStatusTrend(u.getTenantId(), timeRange));
+    }
+
+    @GetMapping("/worksheets/rejection-rate")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Worksheet rejection rate over time")
+    public ResponseEntity<Map<String, Object>> getWorksheetRejectionRate(
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getWorksheetRejectionRate(u.getTenantId(), timeRange));
+    }
+
+    // ── Instrument analytics ──────────────────────────────────────────────────────
+
+    @GetMapping("/instruments/uptime")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Instrument availability/uptime summary")
+    public ResponseEntity<Map<String, Object>> getInstrumentUptime(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInstrumentUptime(u.getTenantId(), branchId, timeRange));
+    }
+
+    @GetMapping("/instruments/calibration-status")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Instrument calibration status breakdown")
+    public ResponseEntity<Map<String, Object>> getInstrumentCalibrationStatus(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInstrumentCalibrationStatus(u.getTenantId(), branchId));
+    }
+
+    @GetMapping("/instruments/usage-by-product")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Instrument usage/reservations by instrument code")
+    public ResponseEntity<Map<String, Object>> getInstrumentUsageByProduct(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInstrumentUsageByProduct(u.getTenantId(), branchId, timeRange));
+    }
+
+    // ── Inventory analytics ───────────────────────────────────────────────────────
+
+    @GetMapping("/inventory/consumption")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    @Operation(summary = "Reagent consumption over time")
+    public ResponseEntity<Map<String, Object>> getInventoryConsumption(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInventoryConsumptionByTimeRange(u.getTenantId(), branchId, timeRange));
+    }
+
+    @GetMapping("/inventory/issuance-destruction")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    @Operation(summary = "Issuance vs consumed inventory comparison")
+    public ResponseEntity<Map<String, Object>> getIssuanceDestruction(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInventoryIssuanceDestruction(u.getTenantId(), branchId, timeRange));
+    }
+
+    @GetMapping("/inventory/cost-per-product")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    @Operation(summary = "Estimated inventory cost per reagent/product")
+    public ResponseEntity<Map<String, Object>> getInventoryCostPerProduct(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getInventoryCostPerProduct(u.getTenantId(), branchId));
+    }
+
+    // ── QA analytics ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/qa/deviation-trend")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Deviation count trend over time")
+    public ResponseEntity<Map<String, Object>> getDeviationTrend(
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getDeviationTrend(u.getTenantId(), timeRange));
+    }
+
+    @GetMapping("/qa/deviation-severity")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Deviation breakdown by severity and status")
+    public ResponseEntity<Map<String, Object>> getDeviationSeverity(
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getDeviationSeverity(u.getTenantId()));
+    }
+
+    @GetMapping("/qa/capa-closure")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "CAPA closure rate")
+    public ResponseEntity<Map<String, Object>> getCapaClosure(
+            @RequestParam(required = false) String timeRange,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getCapaClosureRate(u.getTenantId(), timeRange));
+    }
+
+    @GetMapping("/qa/root-cause")
+    @PreAuthorize("hasAuthority('ANALYTICS_VIEW')")
+    @Operation(summary = "Root cause / deviation type analysis")
+    public ResponseEntity<Map<String, Object>> getRootCause(
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getRootCauseAnalysis(u.getTenantId()));
+    }
+
+    // ── AI analytics ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/ai/oos-risk-trend")
+    @PreAuthorize("hasAuthority('AI_OOS_RISK_VIEW')")
+    @Operation(summary = "AI-predicted OOS risk trend from inventory forecasts")
+    public ResponseEntity<Map<String, Object>> getAiOosRiskTrend(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getAiOosRiskTrend(u.getTenantId(), branchId));
+    }
+
+    @GetMapping("/ai/consumption-forecast")
+    @PreAuthorize("hasAuthority('AI_INVENTORY_FORECAST_VIEW')")
+    @Operation(summary = "AI consumption forecast by item")
+    public ResponseEntity<Map<String, Object>> getAiConsumptionForecast(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getAiConsumptionForecast(u.getTenantId(), branchId));
+    }
+
+    @GetMapping("/ai/instrument-failure")
+    @PreAuthorize("hasAuthority('AI_INSTRUMENT_TREND_VIEW')")
+    @Operation(summary = "AI instrument failure prediction alerts")
+    public ResponseEntity<Map<String, Object>> getAiInstrumentFailure(
+            @RequestHeader(value = "X-Branch-Id", required = false) Long branchId,
+            @AuthenticationPrincipal LimsUserDetails u) {
+        return ResponseEntity.ok(analyticsService.getAiInstrumentFailure(u.getTenantId(), branchId));
+    }
 }

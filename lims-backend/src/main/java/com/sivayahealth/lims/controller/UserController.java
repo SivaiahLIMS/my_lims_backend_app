@@ -31,6 +31,13 @@ public class UserController {
     private final UserSkillRepository userSkillRepository;
     private final UserWorkloadRepository userWorkloadRepository;
 
+    @GetMapping
+    @PreAuthorize("hasAuthority('USER_VIEW')")
+    @Operation(summary = "List all users for the current tenant")
+    public ResponseEntity<List<UserResponse>> listUsers(@AuthenticationPrincipal LimsUserDetails userDetails) {
+        return ResponseEntity.ok(userService.getUsersByTenant(userDetails.getTenantId()));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('USER_CREATE')")
     @Operation(summary = "Create a new user")
@@ -43,6 +50,16 @@ public class UserController {
     @Operation(summary = "Get user by ID")
     public ResponseEntity<UserResponse> getUser(@PathVariable Long userId) {
         return ResponseEntity.ok(userService.getUser(userId));
+    }
+
+    @PutMapping("/{userId}")
+    @PreAuthorize("hasAuthority('USER_EDIT')")
+    @Operation(summary = "Update user profile (email, firstName, lastName, phone, status)")
+    public ResponseEntity<UserResponse> updateUser(
+            @PathVariable Long userId,
+            @RequestBody UpdateUserRequest request,
+            @AuthenticationPrincipal LimsUserDetails userDetails) {
+        return ResponseEntity.ok(userService.updateUser(userId, request, userDetails.getTenantId()));
     }
 
     @GetMapping("/tenant/{tenantId}")
@@ -64,6 +81,17 @@ public class UserController {
                 body.get("branchId"),
                 body.get("roleId"));
         return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{userId}/roles/{roleId}")
+    @PreAuthorize("hasAuthority('USER_ASSIGN_ROLE')")
+    @Operation(summary = "Remove a role from a user")
+    public ResponseEntity<Void> removeRole(
+            @PathVariable Long userId,
+            @PathVariable Long roleId,
+            @AuthenticationPrincipal LimsUserDetails userDetails) {
+        userService.removeRole(userId, roleId, userDetails.getTenantId());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{userId}/lock")
