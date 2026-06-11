@@ -34,45 +34,50 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        AppUser user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
-
-        if ("LOCKED".equals(user.getStatus())) {
-            throw new LockedException("Account is locked due to too many failed attempts or inactivity");
-        }
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new DisabledException("Account is not active");
-        }
-
+        long start = System.currentTimeMillis();
         try {
-            Authentication auth = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.username(), request.password())
-            );
+            AppUser user = userRepository.findByUsername(request.username())
+                    .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
 
-            user.setFailedAttempts(0);
-            user.setLastLoginAt(LocalDateTime.now());
-            userRepository.save(user);
-
-            LimsUserDetails userDetails = (LimsUserDetails) auth.getPrincipal();
-            Long branchId = request.branchId();
-            String token = tokenProvider.generateToken(userDetails, branchId);
-            String refreshToken = tokenProvider.generateRefreshToken(user.getUsername());
-
-            auditService.log(user.getTenant().getId(), user.getId(), "AppUser", user.getId(), "LOGIN", null, null);
-
-            return new LoginResponse(token, refreshToken, user.getId(), user.getUsername(),
-                    user.getTenant().getId(), branchId, userDetails.getPermissions());
-
-        } catch (BadCredentialsException ex) {
-            int attempts = user.getFailedAttempts() + 1;
-            user.setFailedAttempts(attempts);
-            if (attempts >= maxFailedAttempts) {
-                user.setStatus("LOCKED");
-                user.setLockedAt(LocalDateTime.now());
-                log.warn("User {} locked after {} failed attempts", user.getUsername(), attempts);
+            if ("LOCKED".equals(user.getStatus())) {
+                throw new LockedException("Account is locked due to too many failed attempts or inactivity");
             }
-            userRepository.save(user);
-            throw ex;
+            if (!"ACTIVE".equals(user.getStatus())) {
+                throw new DisabledException("Account is not active");
+            }
+
+            try {
+                Authentication auth = authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(request.username(), request.password())
+                );
+
+                user.setFailedAttempts(0);
+                user.setLastLoginAt(LocalDateTime.now());
+                userRepository.save(user);
+
+                LimsUserDetails userDetails = (LimsUserDetails) auth.getPrincipal();
+                Long branchId = request.branchId();
+                String token = tokenProvider.generateToken(userDetails, branchId);
+                String refreshToken = tokenProvider.generateRefreshToken(user.getUsername());
+
+                auditService.log(user.getTenant().getId(), user.getId(), "AppUser", user.getId(), "LOGIN", null, null);
+
+                return new LoginResponse(token, refreshToken, user.getId(), user.getUsername(),
+                        user.getTenant().getId(), branchId);
+
+            } catch (BadCredentialsException ex) {
+                int attempts = user.getFailedAttempts() + 1;
+                user.setFailedAttempts(attempts);
+                if (attempts >= maxFailedAttempts) {
+                    user.setStatus("LOCKED");
+                    user.setLockedAt(LocalDateTime.now());
+                    log.warn("User {} locked after {} failed attempts", user.getUsername(), attempts);
+                }
+                userRepository.save(user);
+                throw ex;
+            }
+        } finally {
+            log.info("LOGIN durationMs={}", System.currentTimeMillis() - start);
         }
     }
 
@@ -87,7 +92,7 @@ public class AuthService {
         String newRefresh = tokenProvider.generateRefreshToken(username);
 
         return new LoginResponse(newToken, newRefresh, userDetails.getUser().getId(),
-                username, userDetails.getTenantId(), null, userDetails.getPermissions());
+                username, userDetails.getTenantId(), null);
     }
 
     @Transactional

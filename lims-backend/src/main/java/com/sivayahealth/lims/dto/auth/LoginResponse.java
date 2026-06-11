@@ -1,7 +1,5 @@
 package com.sivayahealth.lims.dto.auth;
 
-import java.util.List;
-
 public record LoginResponse(
     String accessToken,
     String refreshToken,
@@ -9,11 +7,10 @@ public record LoginResponse(
     Long userId,
     String username,
     Long tenantId,
-    Long branchId,
-    List<String> permissions
+    Long branchId
 ) {
     public LoginResponse(String accessToken, String refreshToken, Long userId,
-                         String username, Long tenantId, Long branchId, List<String> permissions) {
-        this(accessToken, refreshToken, "Bearer", userId, username, tenantId, branchId, permissions);
+                         String username, Long tenantId, Long branchId) {
+        this(accessToken, refreshToken, "Bearer", userId, username, tenantId, branchId);
     }
 }
